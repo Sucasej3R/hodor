@@ -86,6 +86,7 @@ import {
   ensureUser,
   markUnverified,
   markUserActive,
+  setBanned,
 } from "../store/users";
 import { createTelegramClient } from "../telegram/client";
 import type { TelegramClient } from "../telegram/types";
@@ -98,6 +99,7 @@ import {
 } from "./errors";
 import { extractContent, relayContent } from "./content";
 import type { TelegramMessageRef } from "./classify";
+import { evaluateInboundSpam } from "./antispam";
 
 /**
  * 展示名三级回退：first_name → @username → ID_<user_id>。topic title（建档时
@@ -239,6 +241,38 @@ export async function handleInbound(
     // 输则静默（持续刷消息不产生持续回复；重验入口由 60s 后的下一条消息提供）
     if (await claimNoticeSlot(env.HODOR_DB, botId, from.id)) {
       await sendVerificationCode(env, botId, from.id, { type: "overflow", limit }, requestOrigin);
+    }
+    return;
+  }
+
+  /* ---------------- 3.5 反黑灰产广告门（敏感词 + AI 判定，绝不放行） ---------------- */
+  // 隐私保护：如果管理员（你）已经在该话题回复过此人（账本中存在 direction='out' 记录），
+  // 说明已经是正常交流对象，后续不再调用外部 AI（防止对方在聊天中复述你的信息被发给 AI）
+  const hasAdminReplied =
+    (await env.HODOR_DB.prepare(
+      "SELECT 1 FROM messages WHERE bot_id = ? AND user_id = ? AND direction = 'out' LIMIT 1",
+    )
+      .bind(botId, from.id)
+      .first()) !== null;
+
+  const spamCheckPayload = isStart ? { type: "text" as const, text: "" } : payload;
+  const spamResult = await evaluateInboundSpam(env, from, spamCheckPayload, {
+    skipAi: isStart || hasAdminReplied,
+  });
+  if (spamResult.blocked) {
+    console.warn(`[inbound] 反垃圾拦截 user ${from.id}：${spamResult.reason ?? "违规广告"}`);
+    if (env.SPAM_AUTO_BAN !== "false") {
+      await setBanned(env.HODOR_DB, botId, from.id, true);
+    }
+    // 如果该水军此前先用普通问候（如“你好”）骗出过话题，第 2 条开始发广告，
+    // 则自动把其已有话题从客服群彻底删除并清理绑定，确保不留任何垃圾痕迹
+    const priorTopic = await findTopicByUser(env.HODOR_DB, botId, from.id);
+    if (priorTopic !== null) {
+      await client.deleteForumTopic({
+        chat_id: supportChatId,
+        message_thread_id: priorTopic.thread_id,
+      });
+      await deleteTopicBinding(env.HODOR_DB, botId, from.id);
     }
     return;
   }

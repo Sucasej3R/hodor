@@ -34,6 +34,18 @@ declare global {
       TURNSTILE_SECRET_KEY?: string;
       /** 【选填 Var】验证页面的固定公网地址（HTTPS origin）；缺省按 webhook 请求 origin 推导 */
       PUBLIC_BASE_URL?: string;
+      /** 【选填 Var】自定义敏感词列表，逗号分隔，支持 re:正则表达式（如：兼职,代发,re:usdt.*承兑） */
+      SPAM_KEYWORDS?: string;
+      /** 【选填 Var】是否启用内置 Telegram 黑灰产高频敏感词库，默认 true；填 false 关闭 */
+      SPAM_PRESET_ENABLED?: string;
+      /** 【选填 Var】识别为黑灰产/广告后是否自动拉黑封禁用户，默认 true；填 false 仅静默丢弃不封禁 */
+      SPAM_AUTO_BAN?: string;
+      /** 【选填 Secret】AI 接口密钥（支持 DeepSeek / 硅基流动 / OpenAI 等兼容接口）；不填则仅启用敏感词拦截 */
+      AI_API_KEY?: string;
+      /** 【选填 Var】AI 接口 Base URL，缺省 https://api.deepseek.com/v1 */
+      AI_BASE_URL?: string;
+      /** 【选填 Var】AI 模型名称，缺省 deepseek-chat */
+      AI_MODEL?: string;
     }
   }
 }

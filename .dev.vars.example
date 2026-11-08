@@ -46,3 +46,22 @@
 # 【选填 Var】验证页面的固定公网地址（HTTPS origin，仅可含根路径，不含凭据 / 查询 / 片段）；
 # 缺省按 webhook 请求的 origin 推导，一般无需配置（多页面域名等特殊部署才需要）
 # PUBLIC_BASE_URL=https://hodor.example.workers.dev
+
+# ==================== 反黑灰产广告配置（敏感词 + AI 识别） ====================
+# 【选填 Var】自定义敏感词（逗号分隔，支持普通词及 re: 开头的正则；系统已默认内置常见 TG 黑灰产词库）
+# SPAM_KEYWORDS=跑分,U商,代发,看简介,re:vx\s*[a-zA-Z0-9_-]{5,}
+
+# 【选填 Var】是否启用内置黑灰产词库（默认 true 开启；如需关闭填 false）
+# SPAM_PRESET_ENABLED=true
+
+# 【选填 Var】识别出黑灰产广告后是否自动永久封禁并清理其话题（默认 true 开启）
+# SPAM_AUTO_BAN=true
+
+# 【选填 Secret】AI 反垃圾 API Key（填入后自动开启 AI 语义识别；推荐 DeepSeek 或硅基流动免费模型）
+# AI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# 【选填 Var】AI 接口地址（OpenAI 兼容格式；默认 https://api.deepseek.com/v1，硅基流动可填 https://api.siliconflow.cn/v1）
+# AI_BASE_URL=https://api.deepseek.com/v1
+
+# 【选填 Var】AI 模型名称（默认 deepseek-chat；硅基流动免费模型可填 Qwen/Qwen2.5-7B-Instruct）
+# AI_MODEL=deepseek-chat

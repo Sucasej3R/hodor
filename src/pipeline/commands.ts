@@ -76,6 +76,7 @@ import {
 import { createTelegramClient } from "../telegram/client";
 import { saveDeleteConfirmation } from "../store/deleteConfirmations";
 import type { InlineKeyboardMarkup } from "../telegram/types";
+import { BUILTIN_SPAM_KEYWORDS, getDbSpamKeywords, updateDbSpamKeywords } from "./antispam";
 
 /**
  * 备注最大长度（Unicode 码点数）：落库前截断——置顶信息 = 昵称 / ID /
@@ -492,6 +493,80 @@ export async function handleCommand(
       buildWipeKeyboard(Math.floor(Date.now() / 1000)),
     );
     return;
+  }
+
+  /* ------------- 敏感词动态管理命令（客服群任意位置或 General 可用） ------------- */
+  if (name === "/kwlist" || name === "/kwadd" || name === "/kwdel" || name === "/kwclear") {
+    const args = parseCommandArgs(params.text);
+    if (name === "/kwlist") {
+      const dbWords = await getDbSpamKeywords(env.HODOR_DB);
+      const envWords = (env.SPAM_KEYWORDS ?? "")
+        .split(",")
+        .map((w) => w.trim())
+        .filter(Boolean);
+      const presetEnabled = env.SPAM_PRESET_ENABLED !== "false";
+      const lines = [
+        "🛡 当前反黑灰产配置状态：",
+        `• 内置黑灰产词库：${presetEnabled ? `已开启（共 ${BUILTIN_SPAM_KEYWORDS.length} 词）` : "已关闭"}`,
+        `• 环境变量词库（SPAM_KEYWORDS）：${envWords.length > 0 ? envWords.join("、") : "未配置"}`,
+        `• 动态词库（D1 数据库）：${dbWords.length > 0 ? dbWords.join("、") : "暂无（可用 /kwadd <词1> <词2> 添加）"}`,
+        `• AI 智能识别：${env.AI_API_KEY?.trim() ? `已开启（模型：${env.AI_MODEL?.trim() || "deepseek-chat"}）` : "未配置 AI_API_KEY"}`,
+        "",
+        "管理命令：/kwadd <词1> <词2> | /kwdel <词> | /kwclear",
+      ];
+      await replyInTopic(env, chatId, threadId, lines.join("\n"));
+      return;
+    }
+    if (name === "/kwadd") {
+      if (!args) {
+        await replyInTopic(
+          env,
+          chatId,
+          threadId,
+          "用法：/kwadd <敏感词1> <敏感词2>（多个词用空格或逗号分隔，支持 re:正则）",
+        );
+        return;
+      }
+      const toAdd = args
+        .split(/[\s,，、]+/)
+        .map((w) => w.trim())
+        .filter(Boolean);
+      const updated = await updateDbSpamKeywords(env.HODOR_DB, (curr) => [...curr, ...toAdd]);
+      await replyInTopic(
+        env,
+        chatId,
+        threadId,
+        `✅ 已添加敏感词：${toAdd.join("、")}\n当前动态词库共 ${updated.length} 个词。`,
+      );
+      return;
+    }
+    if (name === "/kwdel") {
+      if (!args) {
+        await replyInTopic(env, chatId, threadId, "用法：/kwdel <要删除的敏感词>");
+        return;
+      }
+      const toRemove = new Set(
+        args
+          .split(/[\s,，、]+/)
+          .map((w) => w.trim())
+          .filter(Boolean),
+      );
+      const updated = await updateDbSpamKeywords(env.HODOR_DB, (curr) =>
+        curr.filter((w) => !toRemove.has(w)),
+      );
+      await replyInTopic(
+        env,
+        chatId,
+        threadId,
+        `✅ 已移除：${[...toRemove].join("、")}\n当前动态词库剩余 ${updated.length} 个词。`,
+      );
+      return;
+    }
+    if (name === "/kwclear") {
+      await updateDbSpamKeywords(env.HODOR_DB, () => []);
+      await replyInTopic(env, chatId, threadId, "✅ 已清空全部动态敏感词（内置词库与环境变量不受影响）。");
+      return;
+    }
   }
 
   // 未知命令（含 /、/foo、群内误用的 /start 等）：提示管理员并引导 /help

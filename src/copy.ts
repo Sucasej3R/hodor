@@ -124,6 +124,10 @@ const GENERAL_GLOBAL_COMMAND_NAMES: ReadonlySet<string> = new Set([
   "verifymode_button",
   "verifymode_turnstile",
   "help",
+  "kwlist",
+  "kwadd",
+  "kwdel",
+  "kwclear",
 ]);
 
 export function isGeneralGlobalCommand(text: string | undefined): boolean {
