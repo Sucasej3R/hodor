@@ -206,6 +206,19 @@ export async function handleCommand(
   }
 
   if (name === "/ban" || name === "/unban") {
+    const args = parseCommandArgs(params.text);
+    // 支持带用户 ID 参数直接解封/封禁（例如测试反垃圾被无话题自动封禁后，可在 General 用 /unban <用户ID> 解封）
+    if (args !== "" && /^\d+$/.test(args) && Number.isSafeInteger(Number(args))) {
+      const targetUserId = Number(args);
+      await setBanned(env.HODOR_DB, botId, targetUserId, name === "/ban");
+      await replyInTopic(
+        env,
+        chatId,
+        threadId,
+        name === "/ban" ? formatBanConfirmed(targetUserId) : formatUnbanConfirmed(targetUserId),
+      );
+      return;
+    }
     // 反查绑定：closed 行同样可操作（管理操作不依赖 open——区别于中继的
     // 「closed 视同未绑定」）；无行 → 复用无绑定提示（绝不猜测目标用户）
     const owner = await findUserIdByThread(env.HODOR_DB, botId, threadId);
